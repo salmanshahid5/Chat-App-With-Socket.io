@@ -57,7 +57,7 @@ export const loginUser = async (req, res) => {
       token,
       user: {
         id: user._id, username: user.username, email: user.email, bio: user.bio || "",
-        profilePic: user.profilePic || "",
+        profilePic: user.profilePic || "" ,
       },
     });
   } catch (error) {
