@@ -1,6 +1,6 @@
 // middlewares/authMiddleware.js
 import jwt from "jsonwebtoken";
-import User from "../models/userModal.js";
+import User from "../models/userModel.js";
 
 export const authentication = async (req, res, next) => {
   try {
