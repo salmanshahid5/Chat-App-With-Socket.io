@@ -75,3 +75,38 @@ export const getChatById = async (req, res) => {
   }
 };
 
+// Get chats with last message
+export const getChatsWithLastMessage = async (req, res) => {
+  try {
+    const chats = await Chat.find({ members: req.user._id })
+      .populate("members", "username profilePic email")
+      .populate("latestMessage")
+      .sort({ updatedAt: -1 });
+
+    const result = await Promise.all(
+      chats.map(async (chat) => {
+        const unreadCount = await Message.countDocuments({
+          chatId: chat._id,
+          sender: { $ne: req.user._id },
+          readBy: { $ne: req.user._id },
+        });
+
+        return {
+          ...chat.toObject(),
+          lastMessage: chat.latestMessage
+            ? {
+                text: chat.latestMessage.text,
+                time: chat.latestMessage.createdAt,
+              }
+            : null,
+          unreadCount,
+        };
+      })
+    );
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Chats Fetch Error:", error);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
