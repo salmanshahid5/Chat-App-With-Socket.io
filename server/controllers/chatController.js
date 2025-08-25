@@ -31,8 +31,20 @@ export const createChat = async (req, res) => {
   }
 };
 
+//  Get all chats of logged in user
+export const getUserChats = async (req, res) => {
+  try {
+    const chats = await Chat.find({ members: req.user._id })
+      .populate("members", "username email profilePic")
+      .populate({
+        path: "latestMessage",
+        populate: { path: "sender", select: "username email profilePic" }
+      });
 
-
-
-
+    res.status(200).json(chats);
+  } catch (err) {
+    console.error("Error in getUserChats:", err);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
 
