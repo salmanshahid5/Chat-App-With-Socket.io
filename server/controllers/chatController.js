@@ -48,3 +48,30 @@ export const getUserChats = async (req, res) => {
   }
 };
 
+// Get specific chat by ID
+export const getChatById = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+
+    const chat = await Chat.findById(chatId)
+      .populate("members", "username email profilePic")
+      .populate({
+        path: "latestMessage",
+        populate: { path: "sender", select: "username email profilePic" }
+      });
+
+    if (!chat) {
+      return res.status(404).json({ msg: "Chat not found" });
+    }
+
+    if (!chat.members.some(member => member._id.equals(req.user._id))) {
+      return res.status(403).json({ msg: "Not authorized to view this chat" });
+    }
+
+    res.status(200).json(chat);
+  } catch (err) {
+    console.error("Error in getChatById:", err);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
