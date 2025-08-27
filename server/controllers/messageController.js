@@ -50,3 +50,39 @@ export const sendMessage = async (req, res) => {
     res.status(500).json({ msg: "Server error" });
   }
 };
+
+
+// Get Messages
+export const getMessages = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+
+    const messages = await Message.find({ chatId }).populate("sender", "name email");
+
+    res.status(200).json(messages);
+  } catch (error) {
+    console.error("Get Messages Error:", error);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
+
+// Mark all messages as read in a chat
+// const markMessagesAsRead = async (req, res) => {
+//   try {
+//     const { chatId } = req.params;
+//     const userId = req.user._id;
+
+//     await Message.updateMany(
+//       { chatId, readBy: { $ne: userId } }, // jo abhi tak read nahi kiye gaye
+//       { $push: { readBy: userId } }
+//     );
+
+//     res.status(200).json({ msg: "Messages marked as read" });
+//   } catch (error) {
+//     console.error("Mark Read Error:", error);
+//     res.status(500).json({ msg: "Server error" });
+//   }
+// };
+
+// export  default markMessagesAsRead
