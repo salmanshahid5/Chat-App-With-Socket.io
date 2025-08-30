@@ -1,38 +1,41 @@
 import mongoose from "mongoose";
-import User from "../models/userModal.js";
+import User from "../models/userModel.js";
 
 // Friend suggestions
 export const getFriendSuggestions = async (req, res) => {
   try {
-    const userId = req.user._id; // login user id
+    const userId = req.user._id;
 
-    // Current user find karo
     const currentUser = await User.findById(userId);
-
     if (!currentUser) {
       return res.status(404).json({ msg: "User not found" });
     }
 
-    // Following list ko ObjectId array banalo
+    // Following list ko ObjectId array me convert karlo
     const followingIds = currentUser.following.map(
       (id) => new mongoose.Types.ObjectId(id)
     );
 
-    // Suggestions nikalna
+    // Suggestions (jo follow nahi kiye)
     const suggestions = await User.find({
-      $and: [
-        { _id: { $ne: new mongoose.Types.ObjectId(userId) } },
-        { _id: { $nin: followingIds } },
-      ],
+      _id: { $ne: userId, $nin: followingIds },
     }).select("username email profilePic");
 
-    res.status(200).json(suggestions);
+    // Ye find karega kin users ke friendRequests me currentUser ne request bheji hai
+    const sentRequests = await User.find({
+      "friendRequests.from": userId,
+      "friendRequests.status": "pending",
+    }).select("_id");
+
+    res.status(200).json({
+      suggestions,
+      sentRequests: sentRequests.map((u) => u._id.toString()), // sirf IDs bhej do
+    });
   } catch (error) {
     console.error("Error in getFriendSuggestions:", error);
-    res.status(500).json({ msg: error.message });
+    res.status(500).json({ msg: "Server error" });
   }
 };
-
 
 // update profile
 export const updateProfile = async (req, res) => {
@@ -43,7 +46,7 @@ export const updateProfile = async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { username, email, bio },
-      { new: true } 
+      { new: true }
     );
 
     res.json(updatedUser);
