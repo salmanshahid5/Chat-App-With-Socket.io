@@ -54,3 +54,47 @@ export const updateProfile = async (req, res) => {
     res.status(500).json({ msg: err.message });
   }
 };
+
+// Send Friend Request
+export const sendFriendRequest = async (req, res) => {
+  try {
+    const { toUserId } = req.body;
+    const fromUserId = req.user._id;
+
+    if (!toUserId) return res.status(400).json({ msg: "toUserId is required" });
+    if (fromUserId.toString() === toUserId.toString())
+      return res.status(400).json({ msg: "Cannot send request to yourself" });
+
+    const toUser = await User.findById(toUserId);
+    if (!toUser) return res.status(404).json({ msg: "User not found" });
+
+    // Check if already requested
+    const already = toUser.friendRequests.find(
+      (fr) =>
+        (fr.from._id ? fr.from._id.toString() : fr.from.toString()) ===
+        fromUserId.toString()
+    );
+    if (already) return res.status(400).json({ msg: "Already requested" });
+
+    toUser.friendRequests.push({ from: fromUserId, status: "pending" });
+    await toUser.save();
+
+    // Emit event to receiver
+    const io = req.app.get("io"); // app.set("io", io) kiya tha server me
+    io.to(toUserId.toString()).emit("newFriendRequest", {
+      _id: new mongoose.Types.ObjectId(), // ya request ka actual _id agar save kar rahe ho
+      from: {
+        _id: fromUserId,
+        username: req.user.username,
+        profilePic: req.user.profilePic
+      },
+      status: "pending"
+    });
+
+
+    res.json({ msg: "Friend request sent" });
+  } catch (error) {
+    console.error("Error in sendFriendRequest:", error);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
