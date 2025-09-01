@@ -98,3 +98,53 @@ export const sendFriendRequest = async (req, res) => {
     res.status(500).json({ msg: "Server error" });
   }
 };
+
+// Accept Friend Request
+export const acceptRequest = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { fromUserId } = req.body;
+
+    const user = await User.findById(userId);
+    const fromUser = await User.findById(fromUserId);
+
+    if (!user || !fromUser) return res.status(404).json({ msg: "User not found" });
+
+    // Remove the friend request
+    user.friendRequests = user.friendRequests.filter(
+      (r) => r.from.toString() !== fromUserId.toString()
+    );
+
+    // Add each other as friends if not already
+    if (!user.friends.includes(fromUserId)) user.friends.push(fromUserId);
+    if (!fromUser.friends.includes(userId)) fromUser.friends.push(userId);
+
+    await user.save();
+    await fromUser.save();
+
+    const io = req.app.get("io");
+
+    // 🔹 Notify both users with new friend
+    io.to(fromUserId.toString()).emit("newFriend", {
+      _id: userId,
+      username: user.username,
+      profilePic: user.profilePic,
+      email: user.email,
+    });
+
+    io.to(userId.toString()).emit("newFriend", {
+      _id: fromUserId,
+      username: fromUser.username,
+      profilePic: fromUser.profilePic,
+      email: fromUser.email,
+    });
+
+    // Populate the friend to send back to frontend (optional)
+    const populatedFriend = await User.findById(fromUserId).select("username profilePic email");
+
+    res.json({ msg: "Friend request accepted", friend: populatedFriend });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
