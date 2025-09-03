@@ -206,3 +206,40 @@ export const getFriendRequests = async (req, res) => {
     res.status(500).json({ msg: "Server error", error: err.message });
   }
 };
+
+// cancel friend request
+
+export const cancelFriendRequest = async (req, res) => {
+  try {
+    const { toUserId } = req.body; // jis user ko request bheji thi
+    const fromUserId = req.user._id; // logged in user
+
+    if (!toUserId) {
+      return res.status(400).json({ msg: "toUserId is required" });
+    }
+
+    // Target user find karo
+    const toUser = await User.findById(toUserId);
+    if (!toUser) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    // Filter out request
+    const updatedRequests = toUser.friendRequests.filter(
+      (fr) => fr.from.toString() !== fromUserId.toString()
+    );
+
+    if (updatedRequests.length === toUser.friendRequests.length) {
+      return res.status(400).json({ msg: "No pending request found to cancel" });
+    }
+
+    // Save updated list
+    toUser.friendRequests = updatedRequests;
+    await toUser.save();
+
+    res.json({ msg: "Friend request cancelled successfully" });
+  } catch (error) {
+    console.error("Error in cancelFriendRequest:", error);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
