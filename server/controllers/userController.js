@@ -148,3 +148,27 @@ export const acceptRequest = async (req, res) => {
     res.status(500).json({ msg: "Server error" });
   }
 };
+
+// Delete / Cancel Friend Request
+export const deleteFriendRequest = async (req, res) => {
+  try {
+    const userId = req.user._id; // current logged-in user
+    const { fromUserId } = req.body; // the sender of the request
+
+    if (!fromUserId) return res.status(400).json({ msg: "fromUserId is required" });
+
+    const me = await User.findById(userId);
+    if (!me) return res.status(404).json({ msg: "User not found" });
+
+    me.friendRequests = me.friendRequests.filter((fr) => {
+      const fromId = fr.from?._id ? fr.from._id.toString() : fr.from?.toString();
+      return fromId !== fromUserId.toString();
+    });
+
+    await me.save();
+    res.json({ msg: "Friend request deleted" });
+  } catch (error) {
+    console.error("Error in deleteFriendRequest:", error);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
