@@ -208,7 +208,6 @@ export const getFriendRequests = async (req, res) => {
 };
 
 // cancel friend request
-
 export const cancelFriendRequest = async (req, res) => {
   try {
     const { toUserId } = req.body; // jis user ko request bheji thi
@@ -240,6 +239,25 @@ export const cancelFriendRequest = async (req, res) => {
     res.json({ msg: "Friend request cancelled successfully" });
   } catch (error) {
     console.error("Error in cancelFriendRequest:", error);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
+// get friends
+export const getFriends = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const user = await User.findById(userId).populate({
+      path: "friends",
+      select: "username profilePic email", // jo fields chahiye
+    });
+
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    res.json({ friends: user.friends, currentUser: { _id: user._id }, });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: "Server error" });
   }
 };
