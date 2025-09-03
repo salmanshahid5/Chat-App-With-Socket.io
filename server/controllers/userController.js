@@ -172,3 +172,37 @@ export const deleteFriendRequest = async (req, res) => {
     res.status(500).json({ msg: "Server error" });
   }
 };
+
+// get friend requests
+export const getFriendRequests = async (req, res) => {
+  try {
+    //  agar req.user hi undefined hai (auth middleware fail)
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ msg: "Unauthorized - no user found" });
+    }
+
+    const userId = req.user._id;
+
+    const user = await User.findById(userId).populate({
+      path: "friendRequests.from",
+      select: "username email profilePic",
+    });
+
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    const pendingRequests = user.friendRequests
+      .filter((fr) => fr?.status === "pending" && fr?.from) // null safe filter
+      .map((fr) => ({
+        _id: fr._id,          // request id
+        from: fr.from,        // user details
+        status: fr.status,
+      }));
+
+    res.json({ requests: pendingRequests });
+  } catch (err) {
+    console.error("Error in getFriendRequests:", err);
+    res.status(500).json({ msg: "Server error", error: err.message });
+  }
+};
