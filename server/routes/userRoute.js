@@ -5,6 +5,7 @@ import { authentication } from "../middleware/protect.js";
 const router = express.Router();
 router.get('/friend-suggestions', authentication, getFriendSuggestions)
 router.put("/update-profile", authentication, updateProfile);
+router.post("/send-request", authentication, sendFriendRequest);
 
 
 export default router;
