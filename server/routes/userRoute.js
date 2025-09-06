@@ -8,5 +8,6 @@ router.put("/update-profile", authentication, updateProfile);
 router.post("/send-request", authentication, sendFriendRequest);
 router.get("/friend-requests", authentication, getFriendRequests);
 router.post("/cancel-request", authentication, cancelFriendRequest);
+router.post("/accept-request",authentication, acceptRequest);
 
 export default router;
