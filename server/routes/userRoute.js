@@ -6,6 +6,6 @@ const router = express.Router();
 router.get('/friend-suggestions', authentication, getFriendSuggestions)
 router.put("/update-profile", authentication, updateProfile);
 router.post("/send-request", authentication, sendFriendRequest);
-
+router.get("/friend-requests", authentication, getFriendRequests);
 
 export default router;
