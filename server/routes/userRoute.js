@@ -9,5 +9,6 @@ router.post("/send-request", authentication, sendFriendRequest);
 router.get("/friend-requests", authentication, getFriendRequests);
 router.post("/cancel-request", authentication, cancelFriendRequest);
 router.post("/accept-request",authentication, acceptRequest);
+router.post("/delete-requests",authentication, deleteFriendRequest);
 
 export default router;
