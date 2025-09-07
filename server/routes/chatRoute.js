@@ -9,5 +9,9 @@ router.post("/create", authentication, createChat);
 
 router.get("/with-last-message", authentication, getChatsWithLastMessage);
 
+router.get("/", authentication, getUserChats);
+
+router.get("/:chatId", authentication, getChatById);
+
 
 export default router;
