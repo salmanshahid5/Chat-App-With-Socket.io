@@ -11,5 +11,10 @@ const router = express.Router();
 // send new message
 router.post("/", authentication, sendMessage);
 
+// get messages of a chat
+router.get("/:chatId", authentication, getMessages);
+
+// router.put("/mark-read/:chatId", authentication, markMessagesAsRead);
+
 
 export default router;
