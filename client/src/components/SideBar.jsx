@@ -1,30 +1,80 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   HomeIcon,
   ChatBubbleLeftIcon,
   PhoneIcon,
   Cog6ToothIcon,
   UserPlusIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import UserProfileSheet from "./UserProfileSheet";
 import FriendRequestSheet from "./FriendRequestSheet";
+import GroupModal from "./GroupModal.jsx";
+import { api } from "../../helper/api.js";
+import { socket } from "../../helper/socket.js";
 
-const SideBar = () => {
+const SideBar = ({ onToggleGroupMode, selectedFriends }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isFriendSheetOpen, setIsFriendSheetOpen] = useState(false);
+  const [friendRequests, setFriendRequests] = useState([]);
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+
+  // Initial fetch of friend requests
+  useEffect(() => {
+    const fetchFriendRequests = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await api.get("/users/friend-requests", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setFriendRequests(res.data.requests || []);
+      } catch (err) {
+        console.error("Error fetching friend requests:", err);
+      }
+    };
+    fetchFriendRequests();
+  }, []);
+
+  // Real-time updates via socket
+  useEffect(() => {
+    const handleNewRequest = (request) => {
+      if (!request?.from?._id) return;
+      setFriendRequests((prev) => {
+        const exists = prev.some((r) => r.from?._id === request.from._id);
+        if (exists) return prev;
+        return [...prev, request];
+      });
+    };
+
+    const handleRequestAcceptedOrDeleted = (data) => {
+      setFriendRequests((prev) =>
+        prev.filter((r) => r.from?._id !== data.userId)
+      );
+    };
+
+    socket.on("newFriendRequest", handleNewRequest);
+    socket.on("friendRequestAccepted", handleRequestAcceptedOrDeleted);
+    socket.on("friendRequestDeleted", handleRequestAcceptedOrDeleted);
+
+    return () => {
+      socket.off("newFriendRequest", handleNewRequest);
+      socket.off("friendRequestAccepted", handleRequestAcceptedOrDeleted);
+      socket.off("friendRequestDeleted", handleRequestAcceptedOrDeleted);
+    };
+  }, []);
 
   const icons = [
     { id: 1, icon: <HomeIcon className="w-6 h-6" />, label: "Home" },
     { id: 2, icon: <ChatBubbleLeftIcon className="w-6 h-6" />, label: "Messages" },
     { id: 3, icon: <PhoneIcon className="w-6 h-6" />, label: "Calls" },
-    { id: 4, icon: <UserPlusIcon className="w-6 h-6" />, label: "Friend Request" },
-    { id: 5, icon: <Cog6ToothIcon className="w-6 h-6" />, label: "Settings" },
+    { id: 4, icon: <UserGroupIcon className="w-6 h-6" />, label: "Groups" },
+    { id: 5, icon: <UserPlusIcon className="w-6 h-6" />, label: "Friend Request" },
+    { id: 6, icon: <Cog6ToothIcon className="w-6 h-6" />, label: "Settings" },
   ];
 
   return (
     <>
-      <aside className="h-screen w-15 bg-gray-50 flex flex-col items-center py-2 justify-between">
-        {/* Top Icons */}
+      <aside className="h-screen w-[72px] bg-gray-50 flex flex-col items-center py-2 justify-between">
         <div className="flex flex-col items-center">
           {icons.map((item) => (
             <button
@@ -35,21 +85,20 @@ const SideBar = () => {
                 if (item.label === "Friend Request") {
                   setIsFriendSheetOpen(true);
                 }
+                if (item.label === "Groups") {
+                  onToggleGroupMode?.(); // friendlist ko toggle karega
+                }
               }}
             >
               {item.icon}
-
-              {/* Badge only for Friend Request */}
-              {item.label === "Friend Request" && (
+              {item.label === "Friend Request" && friendRequests.length > 0 && (
                 <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                  3
+                  {friendRequests.length}
                 </span>
               )}
             </button>
           ))}
         </div>
-
-        {/* User Profile Image */}
         <div className="mb-4">
           <img
             src="https://i.pravatar.cc/40?img=8"
@@ -61,9 +110,22 @@ const SideBar = () => {
         </div>
       </aside>
 
-      {/* Sheets */}
-      <UserProfileSheet isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
-      <FriendRequestSheet isOpen={isFriendSheetOpen} onClose={() => setIsFriendSheetOpen(false)} />
+      {/* Sheets & Modals */}
+      <UserProfileSheet
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+      />
+      <FriendRequestSheet
+        isOpen={isFriendSheetOpen}
+        onClose={() => setIsFriendSheetOpen(false)}
+        groupMode={isGroupModalOpen}
+        onGroupCreate={() => setIsGroupModalOpen(false)}
+      />
+      <GroupModal
+        isOpen={isGroupModalOpen}
+        onClose={() => setIsGroupModalOpen(false)}
+        selectedFriends={selectedFriends || []}
+      />
     </>
   );
 };
