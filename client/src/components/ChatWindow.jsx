@@ -17,33 +17,102 @@ const ChatWindow = ({ friend, chatId, onBack }) => {
   const messagesEndRef = useRef(null);
   const token = localStorage.getItem("token");
 
+  // Read & normalize current user from localStorage (support common id fields)
   const currentUser = useMemo(() => {
-    const userData = localStorage.getItem("user");
-    return userData ? JSON.parse(userData) : null;
+    try {
+      const raw = localStorage.getItem("user");
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
   }, []);
-  const currentUserId = currentUser?._id;
 
-  // robust sender id getter
+  const currentUserId = useMemo(() => {
+    if (!currentUser) return null;
+    return (
+      currentUser._id ||
+      currentUser.id ||
+      currentUser.userId ||
+      currentUser.uid ||
+      currentUser._uid ||
+      currentUser.uuid ||
+      null
+    );
+  }, [currentUser]);
+
+  // Utility: get sender id from multiple shapes
   const getSenderId = (msg) => {
     if (!msg) return null;
-    if (msg.sender) {
-      if (typeof msg.sender === "string") return msg.sender;
-      if (typeof msg.sender === "object") return msg.sender._id || msg.sender.id || null;
+
+    const s = msg.sender;
+    if (!s) {
+      if (msg.senderId) return msg.senderId;
+      if (msg.sender_id) return msg.sender_id;
+      if (msg.from) return typeof msg.from === "string" ? msg.from : msg.from._id || msg.from.id || null;
+      return null;
     }
-    return msg.senderId || msg.sender_id || null;
+
+    if (typeof s === "string") return s;
+    if (typeof s === "object") {
+      return s._id || s.id || s.userId || s.uid || null;
+    }
+
+    return null;
   };
 
-  const isSentByMe = (msg) => String(getSenderId(msg)) === String(currentUserId);
+  // ensure both sides are strings and trimmed for reliable comparison
+  const isSentByMe = (msg) => {
+    const sid = getSenderId(msg);
+    if (!sid || !currentUserId) return false;
+    return String(sid).trim() === String(currentUserId).trim();
+  };
 
-  // fetch messages
+  // normalize a single message object: ensure sender is object { _id, username?, profilePic? }
+  const normalizeMessage = (m) => {
+    if (!m) return m;
+    const msg = { ...m };
+
+    // if sender is string, convert to object
+    if (msg.sender && typeof msg.sender === "string") {
+      msg.sender = { _id: msg.sender };
+    }
+    if (!msg.sender) {
+      const sid = getSenderId(msg);
+      if (sid) msg.sender = { _id: sid };
+    }
+    if (!msg.createdAt) msg.createdAt = new Date().toISOString();
+
+    return msg;
+  };
+
+  // Helper: are two messages likely the same (used to match temp -> server)
+  const isLikelySameMessage = (tempMsg, serverMsg) => {
+    if (!tempMsg || !serverMsg) return false;
+    if (String(tempMsg._id).startsWith("temp-")) {
+      const sameText = String(tempMsg.text || "").trim() === String(serverMsg.text || "").trim();
+      const t1 = Date.parse(tempMsg.createdAt || 0);
+      const t2 = Date.parse(serverMsg.createdAt || 0);
+      const timeDiff = Number.isFinite(t1) && Number.isFinite(t2) ? Math.abs(t1 - t2) : 0;
+      if (sameText && timeDiff < 15000) return true;
+      if (sameText && Math.abs(Date.now() - t1) < 20000) return true;
+    }
+    return false;
+  };
+
+  // fetch messages (works for group or chat endpoints the same)
   useEffect(() => {
     const fetchMessages = async () => {
-      if (!chatId) return;
+      if (!chatId) {
+        setMessages([]);
+        return;
+      }
       try {
         const res = await api.get(`/groups/${chatId}/messages`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setMessages(res.data || []);
+        const data = Array.isArray(res.data) ? res.data : [];
+        const normalized = data.map(normalizeMessage);
+        setMessages(normalized);
         socket.emit("joinChat", chatId);
       } catch (err) {
         console.error("Error fetching messages:", err);
@@ -55,74 +124,116 @@ const ChatWindow = ({ friend, chatId, onBack }) => {
     };
   }, [chatId, token]);
 
-  // sockets: add messages (no duplicates)
+  // socket listeners for incoming messages
   useEffect(() => {
     const addIfNotExists = (message) => {
       if (!message) return;
+      const normalized = normalizeMessage(message);
+
       setMessages((prev) => {
-        if (message._id && prev.some((m) => String(m._id) === String(message._id))) return prev;
-        return [...prev, message];
+        if (normalized._id) {
+          const filtered = prev.filter((m) => {
+            if (String(m._id).startsWith("temp-") && isLikelySameMessage(m, normalized)) {
+              return false;
+            }
+            return true;
+          });
+          if (filtered.some((m) => String(m._id) === String(normalized._id))) return filtered;
+
+          return [...filtered, normalized];
+        }
+        if (!normalized._id && prev.some((m) => m.text === normalized.text && m.createdAt === normalized.createdAt)) {
+          return prev;
+        }
+
+        return [...prev, normalized];
       });
     };
 
     const onReceive = (message) => {
-      const msgChatId = message?.chatId || message?.groupId || message?.group;
-      if (!chatId || String(msgChatId) !== String(chatId)) return;
+      const msgChatId = message?.chatId || message?.groupId || message?.group || message?.chat;
+      if (!chatId || !msgChatId) return;
+      if (String(msgChatId) !== String(chatId)) return;
       addIfNotExists(message);
     };
 
     socket.on("receiveMessage", onReceive);
     socket.on("newGroupMessage", onReceive);
+    socket.on("chatUpdated", onReceive);
 
     return () => {
       socket.off("receiveMessage", onReceive);
       socket.off("newGroupMessage", onReceive);
+      socket.off("chatUpdated", onReceive);
     };
   }, [chatId]);
 
-  // scroll to bottom
+  // auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // send message
+  // send message (optimistic + replace temp)
   const handleSend = async () => {
     if (!inputText.trim() || !chatId) return;
+
+    const tempId = `temp-${Date.now()}`;
+    const temp = normalizeMessage({
+      _id: tempId,
+      text: inputText,
+      groupId: chatId,
+      isGroup: true,
+      sender: { _id: currentUserId, username: currentUser?.username, profilePic: currentUser?.profilePic },
+      createdAt: new Date().toISOString(),
+    });
+
+    // add optimistic
+    setMessages((prev) => [...prev, temp]);
+    setInputText("");
+
     try {
       const res = await api.post(
         `/groups/${chatId}/messages`,
         { text: inputText },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      let newMsg = res?.data;
-      if (!newMsg) {
-        newMsg = {
-          _id: `temp-${Date.now()}`,
-          text: inputText,
-          groupId: chatId,
-          isGroup: true,
-          sender: { _id: currentUserId, username: currentUser?.username, profilePic: currentUser?.profilePic },
-          createdAt: new Date().toISOString(),
-        };
-      } else if (!getSenderId(newMsg)) {
-        newMsg = {
-          ...newMsg,
-          sender: { _id: currentUserId, username: currentUser?.username, profilePic: currentUser?.profilePic },
-          createdAt: newMsg.createdAt || new Date().toISOString(),
-        };
-      }
+      const serverMsg = normalizeMessage(res?.data);
 
       setMessages((prev) => {
-        if (newMsg._id && prev.some((m) => String(m._id) === String(newMsg._id))) return prev;
-        return [...prev, newMsg];
-      });
+        if (serverMsg._id) {
+          const filtered = prev.filter((m) => {
+            if (String(m._id).startsWith("temp-") && isLikelySameMessage(m, serverMsg)) return false;
+            return true;
+          });
+          if (filtered.some((m) => String(m._id) === String(serverMsg._id))) return filtered;
 
-      setInputText("");
+          return [...filtered, serverMsg];
+        }
+        const withoutTemp = prev.filter((m) => String(m._id) !== String(tempId));
+        return [...withoutTemp, serverMsg];
+      });
     } catch (err) {
       console.error("Error sending message:", err?.response?.data || err);
     }
   };
+
+  // --- NEW helpers for group header ---
+  const isGroupChat = friend?.isGroup || Array.isArray(friend?.members);
+  const getMemberDisplayName = (member) => {
+    if (!member) return "Unknown";
+    if (typeof member === "string") return member;
+    return member.username || member.name || member.fullName || member._id || member.id || "Unknown";
+  };
+
+  const renderMemberList = (members = []) => {
+    if (!Array.isArray(members) || members.length === 0) return "No members";
+    const maxShow = 4; // show up to 4 names then "and X others"
+    const names = members.map(getMemberDisplayName);
+    if (names.length <= maxShow) return names.join(", ");
+    const shown = names.slice(0, maxShow).join(", ");
+    return `${shown} and ${names.length - maxShow} others`;
+  };
+  // --- end helpers ---
 
   return (
     <div className="flex flex-col h-screen bg-[#f9fafb]">
@@ -132,14 +243,33 @@ const ChatWindow = ({ friend, chatId, onBack }) => {
           <button onClick={onBack} className="md:hidden text-gray-600 mr-2">
             <ArrowLeftIcon className="h-6 w-6" />
           </button>
-          <img src={friend?.profilePic || user} alt="avatar" className="w-8 h-8 rounded-full" />
-          <div>
-            <h2 className="font-semibold text-gray-800">
-              {friend?.username ? friend.username.charAt(0).toUpperCase() + friend.username.slice(1) : friend?.name || "Unknown"}
-            </h2>
-            <p className="text-xs text-gray-500">online</p>
-          </div>
+
+          {/* Group header when group, otherwise single chat header */}
+          {isGroupChat ? (
+            <>
+              <img src={friend?.profilePic || user} alt="group-avatar" className="w-8 h-8 rounded-full" />
+              <div>
+                <h2 className="font-semibold text-gray-800">
+                  {friend?.name || "Group Chat"}
+                </h2>
+                <p className="text-xs text-gray-500">
+                  {renderMemberList(friend?.members)}
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <img src={friend?.profilePic || user} alt="avatar" className="w-8 h-8 rounded-full" />
+              <div>
+                <h2 className="font-semibold text-gray-800">
+                  {friend?.username ? friend.username.charAt(0).toUpperCase() + friend.username.slice(1) : friend?.name || "Unknown"}
+                </h2>
+                <p className="text-xs text-gray-500">online</p>
+              </div>
+            </>
+          )}
         </div>
+
         <div className="flex items-center space-x-3 text-gray-500">
           <MagnifyingGlassIcon className="h-5 w-5 cursor-pointer" />
           <PhoneIcon className="h-5 w-5 cursor-pointer" />
@@ -149,58 +279,39 @@ const ChatWindow = ({ friend, chatId, onBack }) => {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-100">
-        {messages.map((msg) => {
+        {messages.map((msg, idx) => {
           const isMe = isSentByMe(msg);
-          const key = msg._id || msg.id || `${msg.groupId || chatId}-${msg.createdAt}-${Math.random()}`;
+          const key = msg._id || `${chatId}-${idx}-${msg.createdAt}`;
 
           return (
             <div key={key} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-              {/* Avatar on left for others */}
               {!isMe && (
                 <img
-                  src={
-                    (msg.sender && (msg.sender.profilePic || `https://i.pravatar.cc/40?u=${getSenderId(msg)}`)) ||
-                    "https://i.pravatar.cc/40?u=other"
-                  }
+                  src={(msg.sender && (msg.sender.profilePic || `https://i.pravatar.cc/40?u=${getSenderId(msg)}`)) || "https://i.pravatar.cc/40?u=other"}
                   alt="avatar"
                   className="w-8 h-8 rounded-full mr-2 self-end"
                 />
               )}
 
               <div className={`flex flex-col max-w-[70%] ${isMe ? "items-end" : "items-start"}`}>
-                {/* Username (only for group chats and not me) */}
                 {!isMe && msg.sender?.username && (
                   <span className="text-xs text-gray-500 mb-1 ml-1">{msg.sender.username}</span>
                 )}
 
-                {/* Bubble */}
-                <div
-                  className={`px-4 py-2 rounded-2xl shadow break-words ${isMe
-                    ? "bg-[#5A65CC] text-white rounded-bl-none"
-                    : "bg-white text-[#242424] rounded-br-none"
-                    }`}
-                >
+                <div className={`px-4 py-2 rounded-2xl shadow break-words ${isMe ? "bg-[#5A65CC] text-white rounded-bl-none" : "bg-white text-[#242424] rounded-br-none"}`}>
                   <p>{msg.text}</p>
                   <p className="text-[10px] text-gray-300 mt-1 text-right">
-                    {msg.createdAt
-                      ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                      : ""}
+                    {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
                   </p>
                 </div>
               </div>
 
-              {/* Avatar on right for me */}
               {isMe && (
-                <img
-                  src={currentUser?.profilePic || "https://i.pravatar.cc/40?u=me"}
-                  alt="avatar"
-                  className="w-8 h-8 rounded-full ml-2 self-end"
-                />
+                <img src={currentUser?.profilePic || "https://i.pravatar.cc/40?u=me"} alt="avatar" className="w-8 h-8 rounded-full ml-2 self-end" />
               )}
             </div>
           );
         })}
-
 
         <div ref={messagesEndRef} />
       </div>
@@ -208,7 +319,14 @@ const ChatWindow = ({ friend, chatId, onBack }) => {
       {/* Input */}
       <div className="p-2 flex items-center space-x-3 bg-[#F9FAFB] border-t border-gray-200">
         <FaceSmileIcon className="h-6 w-6 text-gray-500 cursor-pointer" />
-        <input type="text" placeholder="Type a message..." value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} className="flex-1 px-4 py-2 border rounded-full outline-none focus:ring-0" />
+        <input
+          type="text"
+          placeholder="Type a message..."
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          className="flex-1 px-4 py-2 border rounded-full outline-none focus:ring-0"
+        />
         <button onClick={handleSend} className="p-2 bg-[#5A65CC] text-white rounded-full hover:bg-[#4a54aa] transition">
           <PaperAirplaneIcon className="h-5 w-5" />
         </button>
