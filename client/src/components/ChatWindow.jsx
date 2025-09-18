@@ -236,9 +236,9 @@ const ChatWindow = ({ friend, chatId, onBack }) => {
   // --- end helpers ---
 
   return (
-    <div className="flex flex-col h-screen bg-[#f9fafb]">
+    <div className="flex flex-col h-screen bg-[#ffffff]">
       {/* Top Bar */}
-      <div className="flex justify-between items-center px-4 py-3 bg-gray-50">
+      <div className="flex justify-between items-center px-4 py-3 bg-[#ffffff] border-b border-black/10">
         <div className="flex items-center space-x-3">
           <button onClick={onBack} className="md:hidden text-gray-600 mr-2">
             <ArrowLeftIcon className="h-6 w-6" />
@@ -278,7 +278,7 @@ const ChatWindow = ({ friend, chatId, onBack }) => {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-100">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#ffffff]">
         {messages.map((msg, idx) => {
           const isMe = isSentByMe(msg);
           const key = msg._id || `${chatId}-${idx}-${msg.createdAt}`;
@@ -298,7 +298,7 @@ const ChatWindow = ({ friend, chatId, onBack }) => {
                   <span className="text-xs text-gray-500 mb-1 ml-1">{msg.sender.username}</span>
                 )}
 
-                <div className={`px-4 py-2 rounded-2xl shadow break-words ${isMe ? "bg-[#5A65CC] text-white rounded-bl-none" : "bg-white text-[#242424] rounded-br-none"}`}>
+                <div className={`px-4 py-2 rounded-2xl shadow break-words ${isMe ? "bg-[#00bfa6] text-white rounded-bl-none" : "bg-[#e0f7f3] text-[#242424] rounded-br-none"}`}>
                   <p>{msg.text}</p>
                   <p className="text-[10px] text-gray-300 mt-1 text-right">
                     {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
@@ -317,7 +317,7 @@ const ChatWindow = ({ friend, chatId, onBack }) => {
       </div>
 
       {/* Input */}
-      <div className="p-2 flex items-center space-x-3 bg-[#F9FAFB] border-t border-gray-200">
+      <div className="p-2 flex items-center space-x-3 bg-[#F9FAFB] border-t border-black/10">
         <FaceSmileIcon className="h-6 w-6 text-gray-500 cursor-pointer" />
         <input
           type="text"
@@ -325,9 +325,9 @@ const ChatWindow = ({ friend, chatId, onBack }) => {
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          className="flex-1 px-4 py-2 border rounded-full outline-none focus:ring-0"
+          className="flex-1 px-4 py-2  border border-black/10 rounded-full outline-none focus:ring-0"
         />
-        <button onClick={handleSend} className="p-2 bg-[#5A65CC] text-white rounded-full hover:bg-[#4a54aa] transition">
+        <button onClick={handleSend} className="p-2 bg-[#00bfa6] hover:bg-[#b2f2ea] text-white rounded-full transition cursor-pointer">
           <PaperAirplaneIcon className="h-5 w-5" />
         </button>
       </div>
