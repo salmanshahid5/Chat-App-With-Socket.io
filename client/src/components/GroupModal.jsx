@@ -1,0 +1,120 @@
+import React, { useState } from "react";
+import { CameraIcon } from "@heroicons/react/24/outline";
+import { api } from "../../helper/api";
+
+const GroupModal = ({ isOpen, onClose, selectedFriends, onGroupCreated }) => {
+  const [groupName, setGroupName] = useState("");
+  const [groupImage, setGroupImage] = useState(null);
+  const [previewImage, setPreviewImage] = useState("");
+
+  if (!isOpen) return null;
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setGroupImage(file);
+      setPreviewImage(URL.createObjectURL(file));
+    }
+  };
+
+  const handleCreateGroup = async () => {
+    if (!groupName.trim()) return alert("Please enter a group name!");
+
+    try {
+      const token = localStorage.getItem("token");
+      const formData = new FormData();
+
+      formData.append("name", groupName.trim());
+      formData.append(
+        "members",
+        JSON.stringify(selectedFriends.map((f) => f._id))
+      );
+
+      if (groupImage) formData.append("image", groupImage);
+
+      const res = await api.post("/creategroup", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.status === 201) {
+        onGroupCreated?.(res.data);
+        setGroupName("");
+        setGroupImage(null);
+        setPreviewImage("");
+        onClose();
+      }
+    } catch (err) {
+      console.error("Error creating group:", err);
+      alert(err.response?.data?.msg || "Failed to create group. Please try again.");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+      <div className="bg-white rounded-lg shadow-lg p-6 w-96">
+        <h2 className="text-lg font-semibold mb-4">Create Group</h2>
+
+        {/* Group Image Upload */}
+        <div className="flex justify-center mb-4">
+          <div className="relative">
+            <div className="w-24 h-24 rounded-full overflow-hidden border flex items-center justify-center bg-gray-100">
+              {previewImage ? (
+                <img
+                  src={previewImage}
+                  alt="Group"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-gray-400 text-sm">No Image</span>
+              )}
+            </div>
+
+            <label
+              htmlFor="groupImageUpload"
+              className="absolute bottom-1 right-1 cursor-pointer bg-gray-600 text-white p-2 rounded-full shadow-lg hover:bg-gray-400 transition"
+            >
+              <CameraIcon className="w-4 h-4" />
+            </label>
+
+            <input
+              id="groupImageUpload"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageChange}
+            />
+          </div>
+        </div>
+
+        {/* Group Name Input */}
+        <input
+          type="text"
+          value={groupName}
+          onChange={(e) => setGroupName(e.target.value)}
+          placeholder="Group name"
+          className="w-full border rounded-md px-3 py-2 mb-4 border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#00bfa6] transition"
+        />
+
+        {/* Actions */}
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleCreateGroup}
+            className="px-4 py-2 rounded-md bg-[#00bfa6] hover:bg-[#b2f2ea] text-white cursor-pointer"
+          >
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default GroupModal;
