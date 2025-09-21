@@ -2,18 +2,59 @@ import React, { useState } from "react";
 import { CameraIcon } from "@heroicons/react/24/outline";
 import { api } from "../../helper/api";
 
+
+const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
 const GroupModal = ({ isOpen, onClose, selectedFriends, onGroupCreated }) => {
   const [groupName, setGroupName] = useState("");
   const [groupImage, setGroupImage] = useState(null);
   const [previewImage, setPreviewImage] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setGroupImage(file);
-      setPreviewImage(URL.createObjectURL(file));
+  const handleImageChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    //  Check file size
+    if (file.size > 1 * 1024 * 1024) {
+      alert("Image must be less than 1 MB.");
+      return;
+    }
+
+    // show local preview immediately
+    setPreviewImage(URL.createObjectURL(file));
+    setUploading(true);
+
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("upload_preset", UPLOAD_PRESET);
+
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+        method: "POST",
+        body: fd,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error("Cloudinary upload failed", data);
+        alert("Image upload failed. Check console for details.");
+        setUploading(false);
+        return;
+      }
+
+      // data.secure_url and data.public_id available
+      setPreviewImage(data.secure_url); // update preview to cloud URL
+      setGroupImage({ url: data.secure_url, publicId: data.public_id });
+    } catch (err) {
+      console.error("Upload error:", err);
+      alert("Image upload error. Try again.");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -30,7 +71,11 @@ const GroupModal = ({ isOpen, onClose, selectedFriends, onGroupCreated }) => {
         JSON.stringify(selectedFriends.map((f) => f._id))
       );
 
-      if (groupImage) formData.append("image", groupImage);
+      // send Cloudinary URL instead of the file
+      if (groupImage?.url) {
+        formData.append("imageUrl", groupImage.url);
+        formData.append("imagePublicId", groupImage.publicId || "");
+      }
 
       const res = await api.post("/creategroup", formData, {
         headers: {
@@ -88,6 +133,9 @@ const GroupModal = ({ isOpen, onClose, selectedFriends, onGroupCreated }) => {
           </div>
         </div>
 
+        {/* uploading indicator */}
+        {uploading && <p className="text-sm text-gray-500 mb-2">Uploading image...</p>}
+
         {/* Group Name Input */}
         <input
           type="text"
@@ -108,6 +156,7 @@ const GroupModal = ({ isOpen, onClose, selectedFriends, onGroupCreated }) => {
           <button
             onClick={handleCreateGroup}
             className="px-4 py-2 rounded-md bg-[#00bfa6] hover:bg-[#b2f2ea] text-white cursor-pointer"
+            disabled={uploading}
           >
             Create
           </button>
