@@ -247,7 +247,7 @@ const ChatWindow = ({ friend, chatId, onBack }) => {
           {/* Group header when group, otherwise single chat header */}
           {isGroupChat ? (
             <>
-              <img src={friend?.profilePic || user} alt="group-avatar" className="w-8 h-8 rounded-full" />
+              <img src={friend?.image || user} alt="group-avatar" className="w-8 h-8 rounded-full" />
               <div>
                 <h2 className="font-semibold text-gray-800">
                   {friend?.name || "Group Chat"}
