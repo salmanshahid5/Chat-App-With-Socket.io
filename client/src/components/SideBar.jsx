@@ -19,6 +19,9 @@ const SideBar = ({ onToggleGroupMode, selectedFriends }) => {
   const [friendRequests, setFriendRequests] = useState([]);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
 
+  const storedUser = JSON.parse(localStorage.getItem("user")) || {};
+  const profilePic = storedUser?.profilePic || "https://i.pravatar.cc/40?img=8";
+
   // Initial fetch of friend requests
   useEffect(() => {
     const fetchFriendRequests = async () => {
@@ -74,12 +77,12 @@ const SideBar = ({ onToggleGroupMode, selectedFriends }) => {
 
   return (
     <>
-      <aside className="h-screen w-[72px] bg-gray-50 flex flex-col items-center py-2 justify-between">
+      <aside className="h-screen w-[72px] bg-[#ffffff] flex flex-col items-center py-2 justify-between">
         <div className="flex flex-col items-center">
           {icons.map((item) => (
             <button
               key={item.id}
-              className="relative flex flex-col items-center justify-center w-12 h-12 my-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors duration-200"
+              className="relative flex flex-col items-center justify-center w-12 h-12 my-2 text-gray-600 hover:bg-[#F2FCFA] rounded-lg transition-colors duration-200"
               title={item.label}
               onClick={() => {
                 if (item.label === "Friend Request") {
@@ -101,7 +104,7 @@ const SideBar = ({ onToggleGroupMode, selectedFriends }) => {
         </div>
         <div className="mb-4">
           <img
-            src="https://i.pravatar.cc/40?img=8"
+            src={profilePic}
             alt="User"
             className="w-10 h-10 rounded-full object-cover cursor-pointer"
             title="Profile"
