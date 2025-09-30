@@ -68,21 +68,21 @@ export const getMessages = async (req, res) => {
 
 
 // Mark all messages as read in a chat
-// const markMessagesAsRead = async (req, res) => {
-//   try {
-//     const { chatId } = req.params;
-//     const userId = req.user._id;
+const markMessagesAsRead = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.user._id;
 
-//     await Message.updateMany(
-//       { chatId, readBy: { $ne: userId } }, // jo abhi tak read nahi kiye gaye
-//       { $push: { readBy: userId } }
-//     );
+    await Message.updateMany(
+      { chatId, readBy: { $ne: userId } }, // jo abhi tak read nahi kiye gaye
+      { $push: { readBy: userId } }
+    );
 
-//     res.status(200).json({ msg: "Messages marked as read" });
-//   } catch (error) {
-//     console.error("Mark Read Error:", error);
-//     res.status(500).json({ msg: "Server error" });
-//   }
-// };
+    res.status(200).json({ msg: "Messages marked as read" });
+  } catch (error) {
+    console.error("Mark Read Error:", error);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
 
-// export  default markMessagesAsRead
+export  default markMessagesAsRead

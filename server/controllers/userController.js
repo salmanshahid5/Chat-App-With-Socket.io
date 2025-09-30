@@ -40,12 +40,17 @@ export const getFriendSuggestions = async (req, res) => {
 // update profile
 export const updateProfile = async (req, res) => {
   try {
-    const userId = req.user._id; // token se user aayega
-    const { username, email, bio } = req.body;
+    const userId = req.user._id; 
+    const { username, email, bio, profilePic } = req.body;
+
+    const updatedFields = { username, email, bio };
+    
+    // Only update profilePic if provided
+    if (profilePic) updatedFields.profilePic = profilePic;
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { username, email, bio },
+      updatedFields,
       { new: true }
     );
 
