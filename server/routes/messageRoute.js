@@ -9,10 +9,10 @@ import { authentication } from "../middleware/protect.js";
 const router = express.Router();
 
 // send new message
-router.post("/", authentication, sendMessage);
+router.post("/messages/", authentication, sendMessage);
 
 // get messages of a chat
-router.get("/:chatId", authentication, getMessages);
+router.get("/messages/:chatId", authentication, getMessages);
 
 // router.put("/mark-read/:chatId", authentication, markMessagesAsRead);
 

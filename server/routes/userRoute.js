@@ -3,13 +3,13 @@ import { acceptRequest, cancelFriendRequest, deleteFriendRequest, getFriendReque
 import { authentication } from "../middleware/protect.js";
 
 const router = express.Router();
-router.get('/friend-suggestions', authentication, getFriendSuggestions)
-router.put("/update-profile", authentication, updateProfile);
-router.post("/send-request", authentication, sendFriendRequest);
-router.get("/friend-requests", authentication, getFriendRequests);
-router.post("/cancel-request", authentication, cancelFriendRequest);
-router.post("/accept-request", authentication, acceptRequest);
-router.post("/delete-requests", authentication, deleteFriendRequest);
-router.get("/friends", authentication, getFriends);
+router.get('/users/friend-suggestions', authentication, getFriendSuggestions)
+router.put("/users/update-profile", authentication, updateProfile);
+router.post("/users/send-request", authentication, sendFriendRequest);
+router.get("/users/friend-requests", authentication, getFriendRequests);
+router.post("/users/cancel-request", authentication, cancelFriendRequest);
+router.post("/users/accept-request", authentication, acceptRequest);
+router.post("/users/delete-requests", authentication, deleteFriendRequest);
+router.get("/users/friends", authentication, getFriends);
 
 export default router;

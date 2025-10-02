@@ -4,11 +4,11 @@ import { authentication } from "../middleware/protect.js";
 
 const router = express.Router();
 
-router.post("/create", authentication, createChat);
-router.get("/with-last-message", authentication, getChatsWithLastMessage);
-router.get("/", authentication, getUserChats);
-router.get("/:chatId", authentication, getChatById);
-router.get("/:chatId/messages", authentication, getChatMessages);
-router.post("/message", authentication, sendMessage);
+router.post("/chats/create", authentication, createChat);
+router.get("/chats/with-last-message", authentication, getChatsWithLastMessage);
+router.get("/chats/", authentication, getUserChats);
+router.get("/chats/:chatId", authentication, getChatById);
+router.get("/chats/:chatId/messages", authentication, getChatMessages);
+router.post("/chats/message", authentication, sendMessage);
 
 export default router;
