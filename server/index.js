@@ -19,7 +19,7 @@ const server = createServer(app);
 app.use(express.json());
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: ["https://chat-app-with-socket-io-c9ge.vercel.app","http://localhost:5173", "http://localhost:5174"],
     credentials: true,
   })
 );
@@ -36,7 +36,7 @@ app.get("/", (req, res) => res.send("Server is running"));
 // Socket.io setup
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: ["https://chat-app-with-socket-io-c9ge.vercel.app","http://localhost:5173", "http://localhost:5174"],
     methods: ["GET", "POST"],
     credentials: true,
   },
